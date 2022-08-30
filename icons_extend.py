@@ -147,28 +147,37 @@ def icons_extend(path_list: List[str], width, height, path, case_param: CASE_GET
 
 
 def restore_symlinks(path: str, dump: str, case_param: CASE_GET):
+    print('Restoring symlinks...')
     match case_param:
         case 'deep':
-            symlinks_name = cmd(
-                'find {} -type l | xargs basename'.format(path), shell=True)
+            symlinks = cmd(
+                'find {} -type l'.format(path))
 
-            symlinks_name_list = symlinks_name.split()
+            symlinks_name = []
 
-            for link in symlinks_name_list:
+            for el in symlinks.split():
+                symlinks_name.append(cmd('basename {}'.format(el)))
+
+            for link in symlinks_name:
+                print('Link: {}'.format(link))
                 path_symlink = '{}/{}'.format(path, link)
 
                 target = cmd(
                     'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
-                
+
                 cmd('ln -s {} {}'.format('{}/{}'.format(dump, target),
                                          '{}/{}'.format(dump, link)))
         case 'dir':
-            symlinks_name = cmd(
-                'find {} -maxdepth 1 -type l | xargs basename'.format(path), shell=True)
+            symlinks = cmd(
+                'find {} -maxdepth 1 -type l'.format(path))
+
+            symlinks_name = []
+
+            for el in symlinks.split():
+                symlinks_name.append(cmd('basename {}'.format(el)))
             
-            symlinks_name_list = symlinks_name.split()
-            
-            for link in symlinks_name_list:
+            for link in symlinks_name:
+                print('Link: {}'.format(link))
                 path_symlink = '{}/{}'.format(path, link)
 
                 target = cmd(
