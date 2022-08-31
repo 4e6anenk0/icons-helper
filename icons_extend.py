@@ -142,11 +142,11 @@ def icons_extend(path_list: List[str], width, height, path, case_param: CASE_GET
     print(path_list)
     for el in path_list:
         icon_extend(el, width, height, dump)
-    restore_symlinks(path=path, dump=dump, case_param=case_param)
+    restore_symlinks(path=path, case_param=case_param)
     print('All files were successfully processed. You can find files along this path: {}'.format(dump))
 
 
-def restore_symlinks(path: str, dump: str, case_param: CASE_GET):
+def restore_symlinks(path: str, case_param: CASE_GET):
     print('Restoring symlinks...')
     match case_param:
         case 'deep':
@@ -165,8 +165,7 @@ def restore_symlinks(path: str, dump: str, case_param: CASE_GET):
                 target = cmd(
                     'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
 
-                cmd('ln -s {} {}'.format('{}/{}'.format(dump, target),
-                                         '{}/{}'.format(dump, link)))
+                cmd('ln -s {} {}'.format(target, link))
         case 'dir':
             symlinks = cmd(
                 'find {} -maxdepth 1 -type l'.format(path))
@@ -183,7 +182,5 @@ def restore_symlinks(path: str, dump: str, case_param: CASE_GET):
                 target = cmd(
                     'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
                 
-                cmd('ln -s {} {}'.format('{}/{}'.format(dump, target),
-                                         '{}/{}'.format(dump, link)))
-        case _:
+                cmd('ln -s {} {}'.format(target, link))
             print("not matched")
