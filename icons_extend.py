@@ -1,3 +1,4 @@
+from pathlib import Path
 import re
 import subprocess
 import os
@@ -6,7 +7,8 @@ from typing import List, Literal
 from svgutils.transform import *
 
 
-CASE_GET = Literal['deep', 'dir', 'test']
+CASE_GET = Literal['dir', 'test', 'file']
+
 
 def this_path():
     result = subprocess.run(
@@ -38,8 +40,8 @@ def cmd(cmd: str, shell=False):
     return result.stdout.strip()
 
 
-def _get_command_result(command: list, path: str, *args: str):
-    
+def _get_command_result(command: list, path: str) -> str:
+
     def get_subproc_result(command):
         result = subprocess.run(
             command,
@@ -49,30 +51,21 @@ def _get_command_result(command: list, path: str, *args: str):
         )
         return result.stdout
 
-    if (os.path.isdir(path) == True and not args):  
-        return(get_subproc_result(command))
-    
-    elif (os.path.isdir(path) == True and args):
-        new_commands = command
-        for el in args:
-            new_commands.append(el)
-        return(get_subproc_result(new_commands))
-    
+    if (os.path.isdir(path) == True):
+        return (get_subproc_result(command))
+
     else:
         print('Failed to get the result. Perhaps the wrong command was transmitted or the path does not indicate the directory')
 
 
-def get_all_file_in(path: str, case_param: CASE_GET):
-    print('run: get_all_file_in')
+def get_all_files_in(path: str, case_param: CASE_GET):
+
     match case_param:
-        case 'deep': 
-            print('case: deep')
-            return (_get_command_result(['find', path, '-type', 'f'], path))
         case 'dir':
             print('case: dir')
             return (_get_command_result(['find', path, '-maxdepth', '1', '-type', 'f'], path))
         case 'file':
-            return (icon_extend())
+            return path if os.path.isfile(path) else 'The file was not transferred'
         case 'test':
             return (this_path())
         case _:
@@ -80,7 +73,8 @@ def get_all_file_in(path: str, case_param: CASE_GET):
 
 
 def row_to_list(raw_data: str):
-    return(raw_data.split())
+    return (raw_data.split())
+
 
 def get_float_size_value(fig: SVGFigure) -> float:
     height = 1.0
@@ -103,14 +97,11 @@ def get_float_size_value(fig: SVGFigure) -> float:
     return {'width': width, 'height': height}
 
 
-def icon_extend(path_to_icon: str, new_icon_width: int, new_icon_height: int, dump: str):
-
+def icon_extend(file_path: str, new_icon_width: int, new_icon_height: int, dump: str):
     ''' This is the main function for implementing the extension. \
         Extend is making the canvas bigger but keeping the size and position of the icon '''
 
-    print("Processing... {}".format(path_to_icon))
-    
-    fig = fromfile(path_to_icon)
+    fig = fromfile(file_path)
     new_fig = SVGFigure()
 
     current_height = get_float_size_value(fig=fig)['height']
@@ -118,72 +109,48 @@ def icon_extend(path_to_icon: str, new_icon_width: int, new_icon_height: int, du
 
     bias_factor_x = float(new_icon_width) / current_width - 1
     bias_factor_y = float(new_icon_height) / current_height - 1
-    
+
     x_offset_center = current_width / 2
     y_offset_center = current_height / 2
-    
+
     root = fig.getroot()
     root.moveto(x_offset_center * bias_factor_x,
                 y_offset_center * bias_factor_y)
 
-    name_file = cmd('basename {}'.format(path_to_icon)).splitlines()[0]
+    name_file = cmd('basename {}'.format(file_path)).splitlines()[0]
 
     if not os.path.isdir(dump):
         cmd('mkdir -p {}'.format(dump))
-    
+
     dump_path = '{}/{}'.format(dump, name_file)
-    
+
     new_fig.append(root)
-    new_fig.set_size(("{}px".format(new_icon_width), "{}px".format(new_icon_height)))
+    new_fig.set_size(("{}px".format(new_icon_width),
+                     "{}px".format(new_icon_height)))
     new_fig.save(dump_path)
 
 
-def icons_extend(path_list: List[str], width, height, path, case_param: CASE_GET, dump=this_path()):
-    print(path_list)
-    for el in path_list:
+def icons_extend(file_paths: List[str], width, height, dump=this_path()):
+    for el in file_paths:
         icon_extend(el, width, height, dump)
-    restore_symlinks(path=path, dump=dump, case_param=case_param)
-    print('All files were successfully processed. You can find files along this path: {}'.format(dump))
 
+        
+def restore_symlinks(directory_path: str, dump: str):
 
-def restore_symlinks(path: str, dump: str, case_param: CASE_GET):
-    print('Restoring symlinks...')
-    match case_param:
-        case 'deep':
-            symlinks = cmd(
-                'find {} -type l'.format(path))
+    cmd_str = 'find {} -maxdepth 1 -type l'.format(directory_path)
 
-            symlinks_name = []
+    symlinks = cmd(cmd_str)
 
-            for el in symlinks.split():
-                symlinks_name.append(cmd('basename {}'.format(el)))
+    symlinks_name = []
 
-            for link in symlinks_name:
-                print('Link: {}'.format(link))
-                path_symlink = '{}/{}'.format(path, link)
+    for el in symlinks.split():
+        symlinks_name.append(cmd('basename {}'.format(el)))
 
-                target = cmd(
-                    'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
+    for link in symlinks_name:
 
-                cmd('ln -s {} {}'.format('{}/{}'.format(dump, target),
-                                         '{}/{}'.format(dump, link)))
-        case 'dir':
-            symlinks = cmd(
-                'find {} -maxdepth 1 -type l'.format(path))
+        path_symlink = '{}/{}'.format(directory_path, link)
 
-            symlinks_name = []
+        target = cmd(
+            'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
 
-            for el in symlinks.split():
-                symlinks_name.append(cmd('basename {}'.format(el)))
-            
-            for link in symlinks_name:
-                print('Link: {}'.format(link))
-                path_symlink = '{}/{}'.format(path, link)
-
-                target = cmd(
-                    'readlink -f {} | xargs basename'.format(path_symlink), shell=True)
-                
-                cmd('ln -s {} {}'.format('{}/{}'.format(dump, target),
-                                         '{}/{}'.format(dump, link)))
-        case _:
-            print("not matched")
+        cmd('cd {} && ln -s {} {}'.format(dump, target, link), shell=True)
